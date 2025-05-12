@@ -10,6 +10,7 @@ def menu_chats(is_owner) -> InlineKeyboardMarkup:
             [InlineKeyboardButton("➕ Add chat", callback_data="chat_add")],
             [InlineKeyboardButton("➖ Remove chat", callback_data="chat_remove")],
             [InlineKeyboardButton("📄 List chats", callback_data="chat_list")],
+            [InlineKeyboardButton("📣 Broadcast message", callback_data="chat_notify")],
         ]
     if is_owner:
         rows.append([InlineKeyboardButton("🔙 Return back", callback_data="main_menu")])

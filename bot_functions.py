@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import os
 
 from dotenv import load_dotenv
 from telegram import Update, BotCommand
+from telegram.error import Forbidden, BadRequest, RetryAfter
 from telegram.ext import (
     CommandHandler,
     MessageHandler,
@@ -24,7 +26,8 @@ load_dotenv()
 # -----------------------------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Greet the user and show quick-action button."""
+    """Greet the user and show quick-action button. Add the user to known hosts"""
+    await bot_redis_store.save_user(user_id=update.effective_user.id)
     await update.message.reply_text(
         "Hi! Write me a code, and I will find you the film",
     )
@@ -66,6 +69,16 @@ async def find(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await run_search_and_forward(update, context, " ".join(context.args), bot_redis_store)
 
 
+async def broadcast_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Begin a broadcast – owner only."""
+    if not is_owner(update.effective_user.id, await bot_redis_store.get_owner()):
+        await update.effective_message.reply_text("⛔ Only the owner can use /notify.")
+        return
+
+    ctx.user_data["pending_admin_action"] = "broadcast"
+    await update.effective_message.reply_text("✅ Send me the message to broadcast:")
+
+
 async def passive_find(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Treat any plain text in private chat as a search query (after /start)."""
     chat = update.effective_chat
@@ -77,6 +90,7 @@ async def passive_find(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return  # ignore empty or commands
     logger.info("inputted " + text)
     await run_search_and_forward(update, context, text, bot_redis_store)
+
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/help – show command list."""
@@ -102,6 +116,7 @@ async def store_incoming(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info("New message %s from %s: %s", msg_id, sender, text.replace("\n", " ")[:100])
     await bot_redis_store.save_message(msg_id, text)
 
+
 async def set_commands(application):
     """
     Dynamically register all CommandHandler commands with descriptions
@@ -116,6 +131,54 @@ async def set_commands(application):
                     commands.append(BotCommand(cmd, desc
                                                .strip()))
     await application.bot.set_my_commands(commands)
+
+
+async def _broadcast(from_chat: int, msg_id: int, owner_id: int,
+                     update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not is_owner(update.effective_user.id, owner_id):
+        return
+
+    users = await bot_redis_store.get_users()
+    successes = fails = 0
+
+    for uid in users:
+        try:
+            await ctx.bot.copy_message(
+                chat_id=int(uid),
+                from_chat_id=from_chat,
+                message_id=msg_id,
+            )
+            successes += 1
+
+        except RetryAfter as e:
+            # simple back-off then ONE retry
+            await asyncio.sleep(e.retry_after)
+            try:
+                await ctx.bot.copy_message(int(uid), from_chat, msg_id)
+                successes += 1
+            except (Forbidden, BadRequest, Exception):
+                fails += 1
+
+        except (Forbidden, BadRequest, Exception):
+            # user blocked bot / other copy error → skip
+            fails += 1
+
+    await ctx.bot.send_message(
+        owner_id,
+        text=f"📣 Broadcast done – sent to {successes}, failed for {fails}."
+    )
+
+
+async def handle_broadcast(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not ctx.user_data.pop("pending_admin_action", None):
+        return  # normal traffic
+
+    src_chat = update.effective_chat.id
+    src_msg = update.effective_message.message_id
+    owner_id = update.effective_user.id
+
+    asyncio.create_task(_broadcast(src_chat, src_msg, owner_id, update, ctx))
+    await update.message.reply_text("📣 Broadcast started… I’ll let you know when it’s done.")
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +209,11 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
         return
 
     # ===== stub actions =====
-    if data in {"chat_add", "chat_remove", "chat_list"}:
+    if data in {"chat_add", "chat_remove", "chat_list", "chat_notify"}:
+        if data == "chat_notify":
+            await query.answer()
+            await broadcast_cmd(update, context)
+            return
         await query.answer("Chat-management action not yet implemented.")
         return
 
@@ -175,9 +242,6 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     await query.answer("Unknown action.")
 
-    await query.answer("Unknown action.")
-
-
 
 # ---------------------------------------------------------------------------
 # Owner ID entry handler (after admin_add / admin_remove button)
@@ -188,44 +252,53 @@ async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     owner_id = await bot_redis_store.get_owner()
 
+    if not is_owner(user_id, owner_id):
+        await update.message.reply_text("Only the owner can manage admins.")
+        return
+
     # Only act if this user is the owner and we have a pending action
     pending = context.user_data.get("pending_admin_action")
-    if not (pending and user_id == owner_id):
+    if not pending:
         await passive_find(update, context)
         return  # ignore – not part of the admin flow
 
     text = (update.message.text or "").strip()
-    if not text.isdigit():
-        await update.message.reply_text("Please send a numeric Telegram user ID.")
-        return
+    if pending == "broadcast":
+        await handle_broadcast(update, context)
+    elif pending in {'add', 'remove'}:
+        if not text.isdigit():
+            await update.message.reply_text("Please send a numeric Telegram user ID.")
+            return
 
-    target_id = int(text)
-    if pending == "add":
-        await bot_redis_store.add_admin(target_id)
-        await update.message.reply_text(f"✅ {target_id} added as admin.")
-    elif pending == "remove":
-        await bot_redis_store.remove_admin(target_id)
-        await update.message.reply_text(f"✅ {target_id} removed from admins.")
+        target_id = int(text)
+
+        if pending == "add":
+            await bot_redis_store.add_admin(target_id)
+            await update.message.reply_text(f"✅ {target_id} added as admin.")
+        elif pending == "remove":
+            await bot_redis_store.remove_admin(target_id)
+            await update.message.reply_text(f"✅ {target_id} removed from admins.")
     else:
+
         await update.message.reply_text("Unknown pending action – please try again.")
 
     # Clear pending flag
     context.user_data.pop("pending_admin_action", None)
 
 
-
 # -----------------------------
 # Registration helper
 # -----------------------------
 
-def register(application,):
+def register(application, ):
     """Attach all handlers to *application* and set command menu."""
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("setowner", setowner))
     application.add_handler(CommandHandler("admin", admin_cmd))
+    application.add_handler(CommandHandler("manage", admin_cmd))
+    application.add_handler(CommandHandler("broadcast", broadcast_cmd))
     application.add_handler(CommandHandler("find", find))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_input))
     application.add_handler(CallbackQueryHandler(callback_query_handler))
     application.add_handler(MessageHandler(filters.ALL, store_incoming))
-

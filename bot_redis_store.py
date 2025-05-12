@@ -10,6 +10,7 @@ OWNER_KEY = "bot:owner"
 ADMINS_KEY = "bot:admins"
 CHATS_KEY = "bot:chats"
 HASH_KEY = f"chat:{TARGET_GROUP_ID}:texts"
+USERS = "bot:users"
 MAX_HISTORY = 10_000
 
 # -----------------------------
@@ -25,6 +26,12 @@ async def get_owner() -> int | None:
 
 async def set_owner(user_id: int):
     await redis_client.set(OWNER_KEY, user_id)
+
+async def save_user(user_id: int):
+    await redis_client.sadd(USERS, user_id)
+
+async def get_users() -> set[str]:
+    return await redis_client.smembers(USERS)
 
 
 async def is_admin(user_id: int) -> bool:
