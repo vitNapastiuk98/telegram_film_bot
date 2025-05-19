@@ -3,6 +3,8 @@
 # ---------------------------------------------------------------------------
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
+from bot_helpers import logger
+
 
 def menu_chats(is_owner) -> InlineKeyboardMarkup:
     rows = [
@@ -37,9 +39,12 @@ def menu_root_owner() -> InlineKeyboardMarkup:
     )
 
 
-def chat_list_menu(chats: dict) -> InlineKeyboardMarkup:
+def chat_list_menu(chats: dict, for_removal: bool = False) -> InlineKeyboardMarkup:
     rows = []
-    for chat_name, chat_data in chats.items():
-        rows.append([InlineKeyboardButton(chat_name, callback_data=chat_data)])
-
+    for chat_name, chat_link in chats.items():
+        if for_removal:
+            callback_data = chat_name
+            rows.append([InlineKeyboardButton(chat_name, callback_data=callback_data)])
+        else:
+            rows.append([InlineKeyboardButton(chat_name, url=chat_link)])
     return InlineKeyboardMarkup(rows)

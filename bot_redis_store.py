@@ -89,6 +89,7 @@ async def do_search(query: str) -> list[int]:
     texts = await get_all_texts()                       # {msg_id: text}
 
     for mid, raw in texts.items():
+        
         if not raw:
             continue
 
