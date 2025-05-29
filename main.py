@@ -1,32 +1,30 @@
-"""Entry point – bootstraps the Telegram application and wires handlers.
-Run with:  python main.py
-"""
+#!/usr/bin/env python3
 import os
 
 from dotenv import load_dotenv
-from telegram.ext import ApplicationBuilder
-from bot_helpers import logger
-from bot_functions import register
 
-
+# build_resources must run before any strings are used
+from build_resources import build_resources
 
 load_dotenv()
-TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
+# pick the language and build
+LANG = os.getenv("BOT_LANG", "en")
+build_resources(LANG)
+
+from telegram.ext import ApplicationBuilder
+from bot_helpers import logger, STRINGS, TOKEN
+from bot_handlers import register
 
 def main() -> None:
-    if not TOKEN:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN is not set")
-
-    logger.info("Starting bot application …")
-    logger.info(TOKEN)
-    application = ApplicationBuilder().token(TOKEN).build()
-    register(application)  # plug in handlers & menus
+    logger.info(f'The bot is running with lang {LANG}'
+                f'')
+    app = ApplicationBuilder().token(TOKEN).build()
+    register(app)
     try:
-        application.run_polling()
+        app.run_polling()
     finally:
-        logger.info("Bot stopped.")
-
+        logger.info(STRINGS["bot_stopped"])
 
 if __name__ == "__main__":
     main()

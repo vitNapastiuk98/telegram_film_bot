@@ -1,14 +1,19 @@
+import asyncio
 import os
 import logging
+import json
 
 from dotenv import load_dotenv
-from telegram import Update
 from telegram.ext import ContextTypes
+
 # -----------------------------
 # Global configuration helpers
 # -----------------------------
 load_dotenv()
 TARGET_GROUP_ID: int = int(os.getenv("TARGET_GROUP_ID", ""))
+TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+if not TOKEN:
+    raise RuntimeError("No TELEGRAM_BOT_TOKEN environment variable set")
 
 def setup_logging() -> logging.Logger:
     """Initialise the root logger and return a logger for the caller."""
@@ -20,6 +25,13 @@ def setup_logging() -> logging.Logger:
 
 
 logger = setup_logging()
+
+RES_PATH = os.getenv("RES_JSON_PATH", "res.json")
+try:
+    with open(RES_PATH, encoding="utf-8") as f:
+        STRINGS = json.load(f)
+except Exception as e:
+    raise RuntimeError(f"Could not load resources: {e}")
 
 
 
@@ -48,21 +60,3 @@ async def is_authorised(user_id: int, redis_store) -> bool:
 def is_owner(user_id: int, owner_id: int | None) -> bool:
     return owner_id is not None and user_id == owner_id
 
-
-async def run_search_and_forward(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, query: str, redis_store
-) -> None:
-    user_id = update.effective_user.id
-    logger.info(f"Searching for {query}")
-    matches = await redis_store.do_search(query)
-    logger.info(f"Found {len(matches)} matches")
-    if not matches:
-        await update.message.reply_text("No matches found.")
-        return
-
-    for mid in sorted(matches):
-        try:
-            await context.bot.copy_message(user_id, TARGET_GROUP_ID, mid)
-        except Exception as exc:
-            logger.warning("Search forward %s failed: %s", mid, exc)
-            continue

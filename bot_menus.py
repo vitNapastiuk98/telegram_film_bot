@@ -1,50 +1,36 @@
-# ---------------------------------------------------------------------------
-# Inline keyboards
-# ---------------------------------------------------------------------------
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-
-from bot_helpers import logger
-
+from bot_helpers import STRINGS
 
 def menu_chats(is_owner) -> InlineKeyboardMarkup:
     rows = [
-
-            [InlineKeyboardButton("➕ Add chat", callback_data="chat_add")],
-            [InlineKeyboardButton("➖ Remove chat", callback_data="chat_remove")],
-            [InlineKeyboardButton("📄 List chats", callback_data="chat_list")],
-            [InlineKeyboardButton("📣 Broadcast message", callback_data="chat_notify")],
-        ]
+        [InlineKeyboardButton(STRINGS["btn_add_chat"], callback_data="chat_add")],
+        [InlineKeyboardButton(STRINGS["btn_remove_chat"], callback_data="chat_remove")],
+        [InlineKeyboardButton(STRINGS["btn_list_chats"], callback_data="chat_list")],
+        [InlineKeyboardButton(STRINGS["btn_broadcast_message"], callback_data="chat_notify")],
+    ]
     if is_owner:
-        rows.append([InlineKeyboardButton("🔙 Return back", callback_data="main_menu")])
+        rows.append([InlineKeyboardButton(STRINGS["btn_return_back"], callback_data="main_menu")])
     return InlineKeyboardMarkup(rows)
 
-
 def menu_admins() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton("➕ Add admin", callback_data="admin_add")],
-            [InlineKeyboardButton("➖ Remove admin", callback_data="admin_remove")],
-            [InlineKeyboardButton("📄 List admins", callback_data="admin_list")],
-            [InlineKeyboardButton("🔙 Return back", callback_data="main_menu")],
-        ]
-    )
-
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(STRINGS["btn_add_chat"].replace("chat", "admin"), callback_data="admin_add")],
+        [InlineKeyboardButton(STRINGS["btn_remove_chat"].replace("chat", "admin"), callback_data="admin_remove")],
+        [InlineKeyboardButton(STRINGS["btn_list_chats"].replace("chat", "admins"), callback_data="admin_list")],
+        [InlineKeyboardButton(STRINGS["btn_return_back"], callback_data="main_menu")],
+    ])
 
 def menu_root_owner() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton("👥 Manage admins", callback_data="menu_admins")],
-            [InlineKeyboardButton("💬 Manage chats", callback_data="menu_chats")],
-        ]
-    )
-
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(STRINGS["btn_manage_admins"], callback_data="menu_admins")],
+        [InlineKeyboardButton(STRINGS["btn_manage_chats"], callback_data="menu_chats")],
+    ])
 
 def chat_list_menu(chats: dict, for_removal: bool = False) -> InlineKeyboardMarkup:
     rows = []
-    for chat_name, chat_link in chats.items():
+    for name, link in chats.items():
         if for_removal:
-            callback_data = chat_name
-            rows.append([InlineKeyboardButton(chat_name, callback_data=callback_data)])
+            rows.append([InlineKeyboardButton(name, callback_data=name)])
         else:
-            rows.append([InlineKeyboardButton(chat_name, url=chat_link)])
+            rows.append([InlineKeyboardButton(name, url=link)])
     return InlineKeyboardMarkup(rows)
