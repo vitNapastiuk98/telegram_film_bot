@@ -150,11 +150,12 @@ async def send_chat_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_authorised(user_id, bot_redis_store):
         return
 
-    chats = await bot_redis_store.get_chats()
+    chats  = {chat_name: chat['link'] for chat_name, chat in (await bot_redis_store.get_chats()).items()}
+
     if not chats:
         await update.effective_message.reply_text(STRINGS["no_chats_added"])
     else:
-        await update.effective_message.reply_text(STRINGS["current_chats"], reply_markup=chat_list_menu(chats))
+        await update.effective_message.reply_text(STRINGS["current_chats"], reply_markup=bot_menus.chat_list_menu(chats))
 
 
 async def add_admin(target_id: int, update: Update):

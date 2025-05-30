@@ -73,7 +73,7 @@ async def list_admins():
 async def get_chats():
     result = await redis_client.ft(CHATS_KEY).search(Query("*"))
     logger.info(f"Got {len(result.docs)} {result} {result.docs} chats")
-    return {doc.id.replace('chat:', ''): {
+    return {doc.id.replace('marketing:', ''): {
         'name': doc.name,
         'chat_id': int(doc.chat_id),
         'link': doc.link
@@ -91,6 +91,8 @@ async def set_chat(chat_name: str, chat_id: int, chat_link: str):
 
 async def del_chat(chat_name: str):
     await redis_client.delete(f"marketing:{chat_name}")
+    # await redis_client.ft(f"marketing:{chat_name}").delete_document(f"marketing:{chat_name}").execute()
+    logger.info(f"Deleted chat from redis {chat_name}")
 
 
 
