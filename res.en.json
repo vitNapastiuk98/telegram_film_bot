@@ -43,5 +43,8 @@
   "broadcast_res": "📣 Broadcast done – sent to {successes}, failed for {fails}.",
   "chat_name_prompt": "✅ Send chat name",
   "chat_link_prompt": "✅ Send chat link",
-  "forward_chat_prompt": "✅ Forward a message from the chat"
+  "forward_chat_prompt": "✅ Forward a message from the chat",
+   "btn_add_admin": "➕ add admin",
+  "btn_remove_admin": "➖ remove admin",
+  "btn_list_admins": "📄 list admins"
 }

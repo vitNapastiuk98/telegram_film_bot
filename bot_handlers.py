@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import asyncio
 
@@ -248,6 +247,10 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
 async def handle_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Process inputs"""
     logger.info(f'context.user_data = {context.user_data}')
+    if context.user_data is None :
+        logger.info(f'context.user_data is empty')
+        return
+
     action = context.user_data.get("pending_chat_action")
     if action:
         await handle_chat_input(update, context)

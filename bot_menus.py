@@ -14,9 +14,9 @@ def menu_chats(is_owner) -> InlineKeyboardMarkup:
 
 def menu_admins() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(STRINGS["btn_add_chat"].replace("chat", "admin"), callback_data="admin_add")],
-        [InlineKeyboardButton(STRINGS["btn_remove_chat"].replace("chat", "admin"), callback_data="admin_remove")],
-        [InlineKeyboardButton(STRINGS["btn_list_chats"].replace("chat", "admins"), callback_data="admin_list")],
+        [InlineKeyboardButton(STRINGS["btn_add_admin"], callback_data="admin_add")],
+        [InlineKeyboardButton(STRINGS["btn_remove_admin"], callback_data="admin_remove")],
+        [InlineKeyboardButton(STRINGS["btn_list_admins"], callback_data="admin_list")],
         [InlineKeyboardButton(STRINGS["btn_return_back"], callback_data="main_menu")],
     ])
 
